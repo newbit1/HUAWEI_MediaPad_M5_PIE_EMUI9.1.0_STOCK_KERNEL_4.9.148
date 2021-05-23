@@ -1,0 +1,65 @@
+#!/bin/bash
+function yes_or_no {
+    while true; do
+        read -p "$* [y/n]: " yn
+        case $yn in
+            [Yy]*) return 0  ;;
+            [Nn]*) echo "Aborted" ; return  1 ;;
+            *) return 0  ;;            
+            
+        esac
+    done
+}
+
+GetAIK() {
+	AIKURL=https://forum.xda-developers.com/attachments/aik-linux-v3-8-all-tar-gz.5300923
+	AIKDIR=$(pwd)/../AIK-Linux
+	if [ ! -d "$AIKDIR" ]; then
+		wget -c $AIKURL -O - | tar -xz -C ../
+	fi
+}
+
+GetKernel() {
+	kernel=$(pwd)/../out/arch/arm64/boot/Image.gz
+	if [ ! -e "$kernel" ]; then
+		echo "no Kernel Image to insert"
+		exit 1
+	fi
+}
+
+GetKernelIMG() {
+	KERNELIMG=$(pwd)/../kernel.img
+	if [[ ! "$1" == "" ]]; then
+		KERNELIMG=$1
+	fi
+	
+	if [ ! -e "$KERNELIMG" ]; then
+		echo "no Kernel Image to unpack"
+		exit 1
+	fi
+}
+
+GetAIK
+GetKernel
+GetKernelIMG $@
+$AIKDIR/cleanup.sh
+cp $KERNELIMG $AIKDIR
+$AIKDIR/unpackimg.sh $KERNELIMG
+cp $kernel $AIKDIR/split_img/${KERNELIMG##*/}-kernel
+read -p "If you want to make changes like androidboot.selinux=permissive and buildvariant=userdebug, do it now" </dev/tty
+$AIKDIR/repackimg.sh
+yes_or_no "Press Any Key If you want to reboot into bootloader via ADB" && adb wait-for-usb-device && adb reboot bootloader
+read -p "Press Enter when in bootloader to continue" </dev/tty
+sudo fastboot flash kernel $AIKDIR/image-new.img
+sudo fastboot reboot
+echo "made it so far"
+exit 0
+
+
+
+
+
+
+
+
+
